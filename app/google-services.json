@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "422797565298",
+    "project_id": "pagerchat-f7ef6",
+    "storage_bucket": "pagerchat-f7ef6.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:422797565298:android:44a0ea4cdf25561e6e11eb",
+        "android_client_info": {
+          "package_name": "com.example.pagerchat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "422797565298-o5ji11aija9bvo14c0ciol189cj71tmq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQkpOBhRKFkXyHbDZDNvMXivumq1_Youk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "422797565298-o5ji11aija9bvo14c0ciol189cj71tmq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

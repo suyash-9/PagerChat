@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">PagerChat</string>
+    <string name="waiting_text">Waiting to automatically detect an SMS sent to\n %s Wrong Number?</string>
+    <string name="verify_number">Verify %s</string>
+</resources>
