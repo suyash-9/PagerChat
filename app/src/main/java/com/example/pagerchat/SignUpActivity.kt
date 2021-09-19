@@ -15,7 +15,6 @@ import com.google.android.gms.tasks.Continuation
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.auth.User
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.UploadTask
 import kotlinx.android.synthetic.main.activity_sign_up.*
@@ -48,7 +47,12 @@ class SignUpActivity : AppCompatActivity() {
             } else if (name.isEmpty()) {
                 Toast.makeText(this,"Name cannot be empty", LENGTH_SHORT).show()
             } else {
-                val user = User(name, downloadUrl, downloadUrl/*Needs to thumbnai url*/, auth.uid!!)
+                val user = com.example.pagerchat.models.User(
+                    name,
+                    downloadUrl,
+                    downloadUrl/*Needs to thumbnai url*/,
+                    auth.uid!!
+                )
                 //val user = User(name, downloadUrl, auth.uid!!)
                 database.collection("users").document(auth.uid!!).set(user).addOnSuccessListener {
                     val intent = Intent(this, MainActivity::class.java)

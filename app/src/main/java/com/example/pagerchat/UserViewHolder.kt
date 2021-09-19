@@ -5,13 +5,14 @@ import android.view.View
 
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
+import com.example.pagerchat.models.User
 import com.squareup.picasso.Picasso
 
 import kotlinx.android.synthetic.main.list_item.view.*
 
 class UserViewHolder(itemView: View):RecyclerView.ViewHolder(itemView) {
 
-    fun bind(user:User, onClick:(name:String,photo:String,id:String)->Unit)= with(itemView){
+    fun bind(user: User, onClick:(name:String, photo:String, id:String)->Unit)= with(itemView){
         countTv.isVisible=false
         timeTv.isVisible=false
 

@@ -10,6 +10,7 @@ import androidx.fragment.app.Fragment
 import androidx.paging.PagedList
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.pagerchat.models.User
 import com.firebase.ui.firestore.paging.FirestorePagingAdapter
 import com.firebase.ui.firestore.paging.FirestorePagingOptions
 import com.firebase.ui.firestore.paging.LoadingState
@@ -48,7 +49,7 @@ class PeopleFragment:Fragment() {
 
         val options=FirestorePagingOptions.Builder<User>()
             .setLifecycleOwner(viewLifecycleOwner)
-            .setQuery(database,config,User::class.java)
+            .setQuery(database,config, User::class.java)
             .build()
 
         mAdapter= object : FirestorePagingAdapter<User,RecyclerView.ViewHolder>(options){

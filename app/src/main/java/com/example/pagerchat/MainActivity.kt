@@ -3,7 +3,7 @@ package com.example.pagerchat
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
-import android.widget.SearchView
+import com.example.pagerchat.Adapters.ScreenSlideAdapter
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.android.synthetic.main.activity_main.*
@@ -13,7 +13,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
-        viewPager.adapter=ScreenSlideAdapter(this)
+        viewPager.adapter= ScreenSlideAdapter(this)
         TabLayoutMediator(tabs,viewPager,TabLayoutMediator.TabConfigurationStrategy{ tab: TabLayout.Tab, i: Int ->
             when(i){
                 0->tab.text="CHATS"

@@ -1,4 +1,4 @@
-package com.example.pagerchat
+package com.example.pagerchat.models
 
 data class User(
     val name: String,
