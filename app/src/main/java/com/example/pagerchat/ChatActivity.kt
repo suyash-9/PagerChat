@@ -1,10 +1,13 @@
 package com.example.pagerchat
 
+import android.content.Context
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.pagerchat.Adapters.ChatAdapter
 import com.example.pagerchat.models.*
+import com.example.pagerchat.utils.KeyboardVisibilityUtil
 import com.example.pagerchat.utils.isSameDayAs
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
@@ -14,12 +17,19 @@ import com.vanniktech.emoji.EmojiManager
 import com.vanniktech.emoji.EmojiPopup
 import com.vanniktech.emoji.google.GoogleEmojiProvider
 import kotlinx.android.synthetic.main.activity_chat.*
+import kotlinx.android.synthetic.main.activity_chat.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
 
 
 const val NAME="name"
 const val UID="uid"
 const val IMAGE="photo"
 class ChatActivity : AppCompatActivity() {
+
     private val friendId by lazy {
         intent.getStringExtra(UID)
     }
@@ -29,69 +39,152 @@ class ChatActivity : AppCompatActivity() {
     private val image by lazy {
         intent.getStringExtra(IMAGE)
     }
-    private val mCurrentUid by lazy {
+    private val mCurrentUid: String by lazy {
         FirebaseAuth.getInstance().uid!!
     }
     private val db: FirebaseDatabase by lazy {
         FirebaseDatabase.getInstance()
     }
-
     lateinit var currentUser: User
-    private val messages: MutableList<ChatEvent> = mutableListOf()
     lateinit var chatAdapter: ChatAdapter
+
+    private lateinit var keyboardVisibilityHelper: KeyboardVisibilityUtil
+    private val mutableItems: MutableList<ChatEvent> = mutableListOf()
+    private val mLinearLayout: LinearLayoutManager by lazy { LinearLayoutManager(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         EmojiManager.install(GoogleEmojiProvider())
         setContentView(R.layout.activity_chat)
+        keyboardVisibilityHelper = KeyboardVisibilityUtil(rootView) {
+            msgRv.scrollToPosition(mutableItems.size - 1)
+        }
 
-        nameTv.text=name
+        FirebaseFirestore.getInstance().collection("users").document(mCurrentUid).get()
+            .addOnSuccessListener {
+                currentUser = it.toObject(User::class.java)!!
+            }
+
+        chatAdapter = ChatAdapter(mutableItems, mCurrentUid)
+
+        msgRv.apply {
+            layoutManager = mLinearLayout
+            adapter = chatAdapter
+        }
+
+        nameTv.text = name
         Picasso.get().load(image).into(userImgView)
-        listenToMessages()
 
         val emojiPopup = EmojiPopup.Builder.fromRootView(rootView).build(msgEdtv)
         smileBtn.setOnClickListener {
             emojiPopup.toggle()
         }
-//        swipeToLoad.setOnRefreshListener {
-//            val workerScope = CoroutineScope(Dispatchers.Main)
-//            workerScope.launch {
-//                delay(2000)
-//                swipeToLoad.isRefreshing = false
-//            }
-//        }
-
-        FirebaseFirestore.getInstance().collection("users").document(mCurrentUid).get()
-            .addOnSuccessListener {
-                currentUser=it.toObject(User::class.java)!!
+        swipeToLoad.setOnRefreshListener {
+            val workerScope = CoroutineScope(Dispatchers.Main)
+            workerScope.launch {
+                delay(2000)
+                swipeToLoad.isRefreshing = false
             }
-
-        chatAdapter = ChatAdapter(messages, mCurrentUid)
-
-        msgRv.apply {
-            layoutManager = LinearLayoutManager(this@ChatActivity)
-            adapter = chatAdapter
         }
+
 
         sendBtn.setOnClickListener {
             msgEdtv.text?.let {
-                if(it.isNotEmpty()){
+                if (it.isNotEmpty()) {
                     sendMessage(it.toString())
                     it.clear()
                 }
             }
         }
 
+        listenMessages() { msg, update ->
+            if (update) {
+                updateMessage(msg)
+            } else {
+                addMessage(msg)
+            }
+        }
+
+        chatAdapter.highFiveClick = { id, status ->
+            updateHighFive(id, status)
+        }
+        updateReadCount()
+    }
+
+    private fun updateReadCount() {
+        getInbox(mCurrentUid, friendId).child("count").setValue(0)
+    }
+
+    private fun updateHighFive(id: String, status: Boolean) {
+        getMessages(friendId).child(id).updateChildren(mapOf("liked" to status))
+    }
+
+    private fun addMessage(event: Message) {
+        val eventBefore = mutableItems.lastOrNull()
+
+        // Add date header if it's a different day
+        if ((eventBefore != null
+                    && !eventBefore.sentAt.isSameDayAs(event.sentAt))
+            || eventBefore == null
+        ) {
+            mutableItems.add(
+                DateHeader(
+                    event.sentAt, this
+                )
+            )
+        }
+        mutableItems.add(event)
+
+        chatAdapter.notifyItemInserted(mutableItems.size)
+        msgRv.scrollToPosition(mutableItems.size + 1)
+    }
+
+    private fun updateMessage(msg: Message) {
+        val position = mutableItems.indexOfFirst {
+            when (it) {
+                is Message -> it.msgId == msg.msgId
+                else -> false
+            }
+        }
+        mutableItems[position] = msg
+
+        chatAdapter.notifyItemChanged(position)
+    }
+
+    private fun listenMessages(newMsg: (msg: Message, update: Boolean) -> Unit) {
+        getMessages(friendId)
+            .orderByKey()
+            .addChildEventListener(object : ChildEventListener {
+                override fun onCancelled(p0: DatabaseError) {
+
+                }
+
+                override fun onChildMoved(p0: DataSnapshot, p1: String?) {
+
+                }
+
+                override fun onChildChanged(data: DataSnapshot, p1: String?) {
+                    val msg = data.getValue(Message::class.java)!!
+                    newMsg(msg, true)
+                }
+
+                override fun onChildAdded(data: DataSnapshot, p1: String?) {
+                    val msg = data.getValue(Message::class.java)!!
+                    newMsg(msg, false)
+                }
+
+                override fun onChildRemoved(p0: DataSnapshot) {
+                }
+
+            })
+
     }
 
     private fun sendMessage(msg: String) {
-        val id=getMessages(friendId).push().key
-        checkNotNull(id){"Can't be NUll"}
-        val msgMap=Message(msg,mCurrentUid,id)
-        getMessages(friendId).child(id).setValue(msgMap).addOnSuccessListener {
-
-        }
-
+        val id = getMessages(friendId).push().key
+        checkNotNull(id) { "Cannot be null" }
+        val msgMap = Message(msg, mCurrentUid, id)
+        getMessages(friendId).child(id).setValue(msgMap)
         updateLastMessage(msgMap, mCurrentUid)
     }
 
@@ -128,67 +221,43 @@ class ChatActivity : AppCompatActivity() {
         })
     }
 
-    private fun getInbox(toUser: String?, fromUser: String?)= db.reference.child("chats/$toUser/$fromUser")
 
-        private fun getId(friendId: String?):String{
-            return if(friendId!! >mCurrentUid){
-                mCurrentUid+friendId
-            }
-            else{
-                friendId+mCurrentUid
-            }
+    private fun getMessages(friendId: String?) = db.reference.child("messages/${getId(friendId)}")
+
+    private fun getInbox(toUser: String?, fromUser: String?) =
+        db.reference.child("chats/$toUser/$fromUser")
+
+
+    private fun getId(friendId: String?): String {
+        return if (friendId!! > mCurrentUid) {
+            mCurrentUid + friendId
+        } else {
+            friendId + mCurrentUid
         }
-
-        private fun getMessages(friendId: String?) = db.reference.child("messages/${getId(friendId)}")
-
-    private fun listenToMessages(){
-        getMessages(friendId)
-            .orderByKey()
-            .addChildEventListener(object : ChildEventListener{
-                override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                    val msg=snapshot.getValue(Message::class.java)!!
-                    addMessage(msg)
-                }
-
-                override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
-                    TODO("Not yet implemented")
-                }
-
-                override fun onChildRemoved(snapshot: DataSnapshot) {
-                    TODO("Not yet implemented")
-                }
-
-                override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
-                    TODO("Not yet implemented")
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    TODO("Not yet implemented")
-                }
-
-            })
     }
 
-    private fun addMessage(msg: Message) {
-        val eventBefore=messages.lastOrNull()
-        if ((eventBefore != null
-                    && !eventBefore.sentAt.isSameDayAs(msg.sentAt))
-            || eventBefore == null
-        ) {
-            messages.add(
-                DateHeader(
-                    msg.sentAt, this
-                )
-            )
-        }
-        messages.add(msg)
-
-        chatAdapter.notifyItemInserted(messages.size)
-        msgRv.scrollToPosition(messages.size + 1)
-
+    override fun onResume() {
+        super.onResume()
+        rootView.viewTreeObserver
+            .addOnGlobalLayoutListener(keyboardVisibilityHelper.visibilityListener)
     }
 
 
-//        supportActionBar!!.setDisplayHomeAsUpEnabled(true)
+    override fun onPause() {
+        super.onPause()
+        rootView.viewTreeObserver
+            .removeOnGlobalLayoutListener(keyboardVisibilityHelper.visibilityListener)
+    }
 
+    companion object {
+
+        fun createChatActivity(context: Context, id: String, name: String, image: String): Intent {
+            val intent = Intent(context, ChatActivity::class.java)
+            intent.putExtra(UID, id)
+            intent.putExtra(NAME, name)
+            intent.putExtra(IMAGE, image)
+
+            return intent
+        }
+    }
 }
